@@ -36,6 +36,7 @@ export enum CommandType {
   sessionList,
   sessionRemove,
   whoami,
+  releaseCordova
 }
 
 export interface ICommand {
@@ -229,4 +230,12 @@ export type ReleaseHook = (
 export interface ReleaseFile {
   sourceLocation: string; // The current location of the file on disk
   targetLocation: string; // The desired location of the file within the zip
+}
+
+export interface IReleaseCordovaCommand extends IReleaseBaseCommand {
+  platform: "ios" | "android";
+  packageType: "cordova";
+  build?: string;
+  isReleaseBuildType?: string;
+  outputDir?: string;
 }

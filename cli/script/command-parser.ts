@@ -867,6 +867,101 @@ yargs
 
     addCommonConfiguration(yargs);
   })
+  .command("release-cordova", "Release a Cordova app update", (yargs: yargs.Argv) => {
+    yargs
+      .usage(USAGE_PREFIX + " release-cordova <appName> <platform> [options]")
+      .demand(/*count*/ 2, /*max*/ 2)
+      .example(
+        "release-cordova MyApp ios ./platforms/ios/www",
+        'Releases the iOS-specific Cordova update package to the "MyApp" app\'s "Staging" deployment'
+      )
+      .example(
+        "release-cordova MyApp android ./platforms/android/assets/www -d Production",
+        'Releases the Android-specific Cordova update package to the "MyApp" app\'s "Production" deployment'
+      )
+      // Existing options
+      .option("deploymentName", {
+        alias: "d",
+        default: "Staging",
+        demand: false,
+        description: "Deployment to release the update to",
+        type: "string",
+      })
+      .option("description", {
+        alias: "des",
+        default: null,
+        demand: false,
+        description: "Description of the changes made to the app with this release",
+        type: "string",
+      })
+      .option("mandatory", {
+        alias: "m",
+        default: false,
+        demand: false,
+        description: "Specifies whether this release should be considered mandatory",
+        type: "boolean",
+      })
+      // Add missing options
+      .option("disabled", {
+        alias: "x",
+        default: false,
+        demand: false,
+        description: "Specifies whether this release should be immediately downloadable",
+        type: "boolean",
+      })
+      .option("private-key-path", {
+        alias: "k",
+        default: null,
+        demand: false,
+        description: "Specifies the location of a RSA private key to sign the release with",
+        type: "string",
+      })
+      .option("disable-duplicate-release-error", {
+        default: false,
+        demand: false,
+        description: "When this flag is set, releasing a package that is identical to the latest release will produce a warning instead of an error",
+        type: "boolean",
+      })
+      .option("rollout", {
+        alias: "r",
+        default: "100",
+        demand: false,
+        description: "Percentage of users this release should be available to",
+        type: "string",
+      })
+      // Existing Cordova specific options
+      .option("targetBinaryVersion", {
+        alias: "t",
+        default: null,
+        demand: false,
+        description: "Semver expression that specifies the binary app version(s) this release is targeting",
+        type: "string",
+      })
+      .option("isReleaseBuildType", {
+        default: null,
+        demand: false,
+        type: "string",
+        description: 'If "build" option is true specifies whether perform a release build'
+      })
+      .option("build", {
+        alias: "b",
+        default: null,
+        demand: false,
+        type: "string",
+        description: `Invoke "cordova build" instead of "cordova prepare"`
+      })
+      // Platform validation
+      .check((argv: any) => {
+        console.log('platform', argv);
+        const platform = argv._[2].toLowerCase();
+        if (["ios", "android"].indexOf(platform) === -1) {
+          throw new Error("Platform must be either 'ios' or 'android'.");
+        }
+        return true;
+      });
+
+    addCommonConfiguration(yargs);
+  })
   .command("whoami", "Display the account info for the current login session", (yargs: yargs.Argv) => {
     isValidCommandCategory = true;
     isValidCommand = true;
@@ -1227,6 +1322,28 @@ export function createCommand(): cli.ICommand {
           releaseReactCommand.xcodeProjectFile = argv["xcodeProjectFile"] as any;
           releaseReactCommand.xcodeTargetName = argv["xcodeTargetName"] as any;
           releaseReactCommand.buildConfigurationName = argv["buildConfigurationName"] as any;
+        }
+        break;
+
+      case "release-cordova":
+        if (arg1 && arg2) {
+          cmd = { type: cli.CommandType.releaseCordova };
+      
+          const releaseCordovaCommand = <cli.IReleaseCordovaCommand>cmd;
+      
+          // Required parameters
+          releaseCordovaCommand.appName = arg1;
+          releaseCordovaCommand.platform = arg2;
+          releaseCordovaCommand.appStoreVersion = argv["targetBinaryVersion"] as any;
+          releaseCordovaCommand.deploymentName = argv["deploymentName"] as any;
+          releaseCordovaCommand.description = argv["description"] ? backslash(argv["description"]) : "";
+          releaseCordovaCommand.disabled = argv["disabled"] as any;
+          releaseCordovaCommand.mandatory = argv["mandatory"] as any;
+          releaseCordovaCommand.noDuplicateReleaseError = argv["noDuplicateReleaseError"] as any;
+          releaseCordovaCommand.rollout = getRolloutValue(argv["rollout"] as any);
+          releaseCordovaCommand.privateKeyPath = argv["privateKeyPath"] as any;
+          releaseCordovaCommand.build = argv["build"] as any;
+          releaseCordovaCommand.isReleaseBuildType = argv["isReleaseBuildType"] as any;
         }
         break;
 

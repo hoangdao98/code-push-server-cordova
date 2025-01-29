@@ -54,7 +54,9 @@ const configFilePath: string = path.join(process.env.LOCALAPPDATA || process.env
 const emailValidator = require("email-validator");
 const packageJson = require("../../package.json");
 const parseXml = Q.denodeify(require("xml2js").parseString);
+import * as xml2js from "xml2js";
 import Promise = Q.Promise;
+import { getCordovaOrPhonegapCLI, getCordovaProjectAppVersion, getOutputFolder, isValidOS, isValidPlatform } from "./cordova-utils";
 const properties = require("properties");
 
 const CLI_HEADERS: Headers = {
@@ -555,6 +557,9 @@ export function execute(command: cli.ICommand) {
 
       case cli.CommandType.whoami:
         return whoami(command);
+      
+      case cli.CommandType.releaseCordova:
+        return releaseCordova(<cli.IReleaseCordovaCommand>command);
 
       default:
         // We should never see this message as invalid commands should be caught by the argument parser.
@@ -1392,6 +1397,8 @@ export const releaseReact = (command: cli.IReleaseReactCommand): Promise<void> =
   );
 };
 
+
+
 function rollback(command: cli.IRollbackCommand): Promise<void> {
   return confirm().then((wasConfirmed: boolean) => {
     if (!wasConfirmed) {
@@ -1607,4 +1614,80 @@ function getSdk(accessKey: string, headers: Headers, customServerUrl: string): A
   });
 
   return sdk;
+}
+
+export function releaseCordova(command: cli.IReleaseCordovaCommand): Promise<void> {
+  const platform: string = command.platform.toLowerCase();
+  const releaseCommand: cli.IReleaseCommand = <any>command;
+
+  // Validate deployment exists
+  return sdk
+    .getDeployment(command.appName, command.deploymentName)
+    .then((res): any => {
+      console.log('deployment', res);
+
+
+      // Validate platform
+      if (!isValidOS(platform)) {
+        throw new Error('Platform must be either "ios" or "android".');
+      }
+
+      let cordovaCLI: string;
+      try {
+        cordovaCLI = getCordovaOrPhonegapCLI();
+      } catch (e) {
+        throw new Error(
+          `Unable to find Cordova or PhoneGap CLI. Please ensure that either is installed.`
+        );
+      }
+
+      // Get app version from config.xml
+      const appCordovaVersionPromise: Q.Promise<string> = command.appStoreVersion
+        ? Q.resolve(command.appStoreVersion)
+        : Q(getCordovaProjectAppVersion(command));
+
+      return appCordovaVersionPromise;
+    })
+    .then((app) => {
+      console.log('app promise', app);
+      // Run Cordova prepare/build command
+      const cordovaCommand = command.build 
+        ? (command.isReleaseBuildType ? "build --release" : "build") 
+        : "prepare";
+
+
+      log(chalk.cyan(`\nRunning "cordova ${cordovaCommand}" command:\n`));
+      
+      return Promise<void>((resolve, reject) => {
+        try {
+          const cordovaCLI = getCordovaOrPhonegapCLI();
+          require("child_process").execSync(
+            `${cordovaCLI} ${cordovaCommand} ${platform} --verbose`,
+            { stdio: "inherit" }
+          );
+          resolve();
+        } catch (error) {
+          reject(new Error(`Failed to run "${cordovaCommand}" command. ${error.message}`));
+        }
+      });
+    })
+    .then(() => {
+      // Get platform specific output folder
+      try {
+        const platformOutputPath = getOutputFolder(platform);
+        releaseCommand.package = platformOutputPath;
+      } catch (error) {
+        throw new Error(`Unable to get output folder: ${error.message}`);
+      }
+    })
+    .then(async () => {
+      if (command.privateKeyPath) {
+        log(chalk.cyan("\nSigning the bundle:\n"));
+        await sign(command.privateKeyPath, releaseCommand.package);
+      }
+    })
+    .then(() => {
+      log(chalk.cyan("\nReleasing update contents to CodePush:\n"));
+      return release(releaseCommand);
+    })
 }
