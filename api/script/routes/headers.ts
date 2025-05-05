@@ -19,10 +19,10 @@ export function getHeadersMiddleware(config: HeadersConfig): express.RequestHand
     }
 
     res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT, PATCH, OPTIONS");
     res.setHeader(
       "Access-Control-Allow-Headers",
-      "Content-Type, X-CodePush-Plugin-Name, X-CodePush-Plugin-Version, X-CodePush-SDK-Version"
+      "Content-Type, X-CodePush-Plugin-Name, X-CodePush-Plugin-Version, X-CodePush-SDK-Version, authorization",
     );
     res.setHeader("Access-Control-Expose-Headers", "Location");
 

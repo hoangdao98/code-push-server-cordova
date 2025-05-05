@@ -8,6 +8,7 @@ import { JsonStorage } from "./storage/json-storage";
 import { RedisManager } from "./redis-manager";
 import { Storage } from "./storage/storage";
 import { Response } from "express";
+import * as cors from "cors"; // Use this for named import
 const { DefaultAzureCredential } = require("@azure/identity");
 const { SecretClient } = require("@azure/keyvault-secrets");
 
@@ -131,7 +132,7 @@ export function start(done: (err?: any, server?: express.Express, storage?: Stor
       app.set("views", __dirname + "/views");
       app.set("view engine", "ejs");
       app.use("/auth/images/", express.static(__dirname + "/views/images"));
-      app.use(api.headers({ origin: process.env.CORS_ORIGIN || "http://localhost:4000" }));
+      app.use(api.headers({ origin: process.env.CORS_ORIGIN || "http://localhost:4200" }));
       app.use(api.health({ storage: storage, redisManager: redisManager }));
 
       if (process.env.DISABLE_ACQUISITION !== "true") {

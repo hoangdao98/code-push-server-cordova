@@ -1,10 +1,16 @@
 {
     "compilerOptions": {
+      "baseUrl": "./",
       "module": "commonjs",
       "noImplicitAny": false,
       "target": "ES2022",
       "outDir": "./bin",
       "skipLibCheck": true,
+      "paths": {
+        "@core/*": ["src/app/core/*"],
+        "@shared/*": ["src/app/shared/*"],
+        "@features/*": ["src/app/features/*"]
+      }
     },
     "exclude": [
       "./bin",

@@ -102,14 +102,15 @@ export class RedisManager {
       const redisConfig = {
         host: process.env.REDIS_HOST,
         port: process.env.REDIS_PORT,
-        auth_pass: process.env.REDIS_KEY,
         tls: {
           // Note: Node defaults CA's to those trusted by Mozilla
-          rejectUnauthorized: true,
+          rejectUnauthorized: false,
+          ca: require('fs').readFileSync('/Users/awwvv/redis/certs/ca.crt'),
         },
       };
       this._opsClient = redis.createClient(redisConfig);
       this._metricsClient = redis.createClient(redisConfig);
+      
       this._opsClient.on("error", (err: Error) => {
         console.error(err);
       });
@@ -137,7 +138,29 @@ export class RedisManager {
       return q.reject<void>("Redis manager is not enabled");
     }
 
-    return q.all([this._promisifiedOpsClient.ping(), this._promisifiedMetricsClient.ping()]).spread<void>(() => {});
+    console.log("Checking Redis manager health");
+    this._promisifiedOpsClient.ping()
+        .then(result => {
+            console.log('Redis Ops Ping Result:',  JSON.stringify(result)); // Will show "PONG"
+        })
+        .catch(err => {
+            console.error('Redis Ops Ping Error:', JSON.stringify(err));
+        });
+
+    this._promisifiedMetricsClient.ping()
+        .then(result => {
+            console.log('Redis Metrics Ping Result:', JSON.stringify(result)); // Will show "PONG"
+        })
+        .catch(err => {
+            console.error('Redis Metrics Ping Error:', JSON.stringify(err));
+        });
+
+    return q.all([this._promisifiedOpsClient.ping(), this._promisifiedMetricsClient.ping()]).spread<void>(() => {
+      console.log("Redis manager is healthy");
+    }, (error: Error) => {
+      console.error("Redis manager is not healthy", error);
+      throw error;
+    });
   }
 
   /**

@@ -9,7 +9,7 @@ import * as passportBearer from "passport-http-bearer";
 import * as passportGitHub from "passport-github2";
 import * as passportWindowsLive from "passport-windowslive";
 import * as q from "q";
-import * as superagent from "superagent"
+import * as superagent from "superagent";
 import rateLimit from "express-rate-limit";
 
 import * as converterUtils from "../utils/converter";
@@ -253,14 +253,16 @@ export class PassportAuthentication {
       limiter,
       this._cookieSessionMiddleware,
       (req: Request, res: Response, next: (err?: any) => void): any => {
+        const isUiLogin = req.query.isUi === "true";
         req.session["action"] = "login";
+        req.session["isUiLogin"] = isUiLogin;
 
         passport.authenticate(strategyName, { session: false })(req, res, next);
       }
     );
 
     router.get(
-      "/auth/register/" + providerName, 
+      "/auth/register/" + providerName,
       limiter,
       this._cookieSessionMiddleware,
       (req: Request, res: Response, next: (err?: any) => void): any => {
@@ -294,7 +296,10 @@ export class PassportAuthentication {
       (req: Request, res: Response, next: (err?: any) => void): any => {
         const action: string = req.session["action"];
         const hostname: string = req.session["hostname"];
+        const isUiLogin = req.session["isUiLogin"];
         const user: passport.Profile = req.user;
+
+        console.log("req", req);
 
         if (action === "register" && !PassportAuthentication.isAccountRegistrationEnabled()) {
           restErrorUtils.sendForbiddenError(res);
@@ -335,7 +340,16 @@ export class PassportAuthentication {
             req.session["accessKey"] = key;
             req.session["isNewAccount"] = action === "register";
 
-            res.redirect("/accesskey");
+            if (isUiLogin) {
+              res.send(`
+                <script>
+                  window.opener.postMessage({ token: "${key}" }, "*");
+                  window.close();
+                </script>
+              `);
+            } else {
+              res.redirect("/accesskey");
+            }
           });
         };
 
@@ -350,8 +364,8 @@ export class PassportAuthentication {
                   const message: string = isProviderValid
                     ? "You are already registered with the service using this authentication provider.<br/>Please cancel the registration process (Ctrl-C) on the CLI and login with your account."
                     : "You are already registered with the service using a different authentication provider." +
-                    "<br/>Please cancel the registration process (Ctrl-C) on the CLI and login with your registered account." +
-                    "<br/>Once logged in, you can optionally link this provider to your account.";
+                      "<br/>Please cancel the registration process (Ctrl-C) on the CLI and login with your registered account." +
+                      "<br/>Once logged in, you can optionally link this provider to your account.";
                   restErrorUtils.sendAlreadyExistsPage(res, message);
                   return;
                 case "link":
@@ -393,7 +407,7 @@ export class PassportAuthentication {
                   restErrorUtils.sendForbiddenPage(
                     res,
                     "We weren't able to link your account, because the primary email address registered with your provider does not match the one on your CodePush account." +
-                    "<br/>Please use a matching email address, or contact us if you'd like to change the email address on your CodePush account."
+                      "<br/>Please use a matching email address, or contact us if you'd like to change the email address on your CodePush account."
                   );
                   return;
                 case "register":
@@ -484,6 +498,8 @@ export class PassportAuthentication {
   private setupAzureAdRoutes(router: Router, microsoftClientId: string, microsoftClientSecret: string): void {
     const providerName = PassportAuthentication.AZURE_AD_PROVIDER_NAME;
     const strategyName = "azuread-openidconnect";
+    console.log("providerName", providerName);
+    console.log("redirectUrl", this.getCallbackUrl(providerName));
     const options: any = {
       redirectUrl: this.getCallbackUrl(providerName),
       clientID: microsoftClientId,
@@ -496,7 +512,7 @@ export class PassportAuthentication {
       scope: ["email", "profile"],
       skipUserProfile: true, // Should be set to true for Azure AD
       validateIssuer: false, // We allow AD authentication across multiple tenants
-      allowHttpForRedirectUrl: true,
+      allowHttpForRedirectUrl: true,  // Access to request object
     };
 
     passport.use(
